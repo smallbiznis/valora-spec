@@ -1,0 +1,44 @@
+components:
+  schemas:
+    Error:
+      type: object
+      additionalProperties: false
+      required:
+        - code
+        - message
+        - retryable
+      properties:
+        code:
+          type: string
+          description: Stable, machine-readable error code.
+        message:
+          type: string
+          description: Human-readable summary intended for operators.
+        retryable:
+          type: boolean
+          description: Whether the request can be retried safely without modification.
+      examples:
+        INVALID_USAGE:
+          summary: Invalid usage payload
+          value:
+            code: INVALID_USAGE
+            message: "Usage record is missing required field: quantity."
+            retryable: false
+        DUPLICATE_IDEMPOTENCY_KEY:
+          summary: Idempotency key replay with a different payload
+          value:
+            code: DUPLICATE_IDEMPOTENCY_KEY
+            message: "Idempotency-Key has already been used with a different payload."
+            retryable: false
+        RATE_LIMITED:
+          summary: Request rate limited
+          value:
+            code: RATE_LIMITED
+            message: "Request rate limit exceeded."
+            retryable: true
+        INTERNAL:
+          summary: Unexpected internal error
+          value:
+            code: INTERNAL
+            message: "Internal error."
+            retryable: true

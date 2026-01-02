@@ -1,0 +1,22 @@
+components:
+  schemas:
+    Pagination:
+      type: object
+      additionalProperties: false
+      required:
+        - cursor
+        - limit
+        - has_more
+      properties:
+        cursor:
+          type: string
+          nullable: true
+          description: Cursor for fetching the next page. Null when there are no more results.
+        limit:
+          type: integer
+          minimum: 1
+          description: Page size requested by the client. Offset-based pagination is not supported.
+        has_more:
+          type: boolean
+          description: True when additional pages can be fetched using cursor.
+      description: Cursor-based pagination only. Offset-based pagination is not supported.

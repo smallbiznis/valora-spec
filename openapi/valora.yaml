@@ -1,0 +1,385 @@
+openapi: 3.1.0
+info:
+  title: Valora Billing API
+  version: 0.1.0
+  description: |
+    Valora Billing API exposes usage ingestion, subscriptions, and invoices.
+    Authentication is required for all endpoints; the mechanism is intentionally unspecified.
+    Offset-based pagination is not supported.
+paths:
+  /usage:
+    post:
+      summary: Ingest usage records
+      description: Accepts usage records for billing. Records are processed asynchronously.
+      operationId: ingestUsage
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UsageIngestRequest'
+      responses:
+        '202':
+          description: Usage accepted for processing.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsageIngestResponse'
+        '400':
+          description: Invalid usage payload.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Idempotency key reused with a different payload.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Rate limited.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /subscriptions:
+    get:
+      summary: List subscriptions
+      description: Returns subscriptions in a cursor-based paginated list.
+      operationId: listSubscriptions
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Subscription list.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriptionListResponse'
+        '429':
+          description: Rate limited.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      summary: Create subscription
+      description: Creates a subscription for a customer.
+      operationId: createSubscription
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubscriptionCreateRequest'
+      responses:
+        '201':
+          description: Subscription created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Subscription'
+        '400':
+          description: Invalid subscription request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Idempotency key reused with a different payload.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Rate limited.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /invoices:
+    get:
+      summary: List invoices
+      description: Returns invoices in a cursor-based paginated list.
+      operationId: listInvoices
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Invoice list.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceListResponse'
+        '429':
+          description: Rate limited.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: Unique key for safely retrying POST requests.
+      schema:
+        type: string
+    Cursor:
+      name: cursor
+      in: query
+      required: false
+      description: Cursor for the next page. Omit to start from the beginning.
+      schema:
+        type: string
+    Limit:
+      name: limit
+      in: query
+      required: false
+      description: Maximum number of items to return. Offset-based pagination is not supported.
+      schema:
+        type: integer
+        minimum: 1
+  schemas:
+    Error:
+      $ref: './components/errors.yaml#/components/schemas/Error'
+    Pagination:
+      $ref: './components/pagination.yaml#/components/schemas/Pagination'
+    UsageIngestRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - records
+      properties:
+        records:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/UsageRecord'
+    UsageRecord:
+      type: object
+      additionalProperties: false
+      required:
+        - record_id
+        - subscription_id
+        - occurred_at
+        - quantity
+        - unit
+      properties:
+        record_id:
+          type: string
+          description: Client-provided unique identifier for the usage record.
+        subscription_id:
+          type: string
+          description: Subscription associated with the usage.
+        occurred_at:
+          type: string
+          format: date-time
+          description: Time when the usage occurred.
+        quantity:
+          type: number
+          minimum: 0
+          description: Quantity for billing.
+        unit:
+          type: string
+          description: Unit of measure for the quantity.
+        metadata:
+          type: object
+          additionalProperties:
+            type: string
+          description: Optional metadata for the usage record.
+    UsageIngestResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - accepted_count
+        - received_at
+      properties:
+        accepted_count:
+          type: integer
+          minimum: 0
+          description: Number of records accepted for processing.
+        received_at:
+          type: string
+          format: date-time
+          description: Server timestamp when the batch was received.
+    SubscriptionCreateRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - customer_id
+        - plan_id
+      properties:
+        customer_id:
+          type: string
+          description: Customer identifier.
+        plan_id:
+          type: string
+          description: Plan identifier.
+        start_at:
+          type: string
+          format: date-time
+          description: Optional start time for the subscription.
+        metadata:
+          type: object
+          additionalProperties:
+            type: string
+          description: Optional metadata for the subscription.
+    Subscription:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - customer_id
+        - plan_id
+        - status
+        - current_period_start
+        - current_period_end
+      properties:
+        id:
+          type: string
+          description: Subscription identifier.
+        customer_id:
+          type: string
+          description: Customer identifier.
+        plan_id:
+          type: string
+          description: Plan identifier.
+        status:
+          $ref: '#/components/schemas/SubscriptionStatus'
+        current_period_start:
+          type: string
+          format: date-time
+          description: Start of the current billing period.
+        current_period_end:
+          type: string
+          format: date-time
+          nullable: true
+          description: End of the current billing period, if known.
+        canceled_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Timestamp when the subscription was canceled, if applicable.
+    SubscriptionStatus:
+      type: string
+      enum:
+        - CREATED
+        - ACTIVE
+        - PAUSED
+        - CANCELED
+        - ENDED
+    SubscriptionListResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - items
+        - page
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Subscription'
+        page:
+          $ref: '#/components/schemas/Pagination'
+    Invoice:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - subscription_id
+        - status
+        - period_start
+        - period_end
+        - currency
+        - total_amount
+        - issued_at
+      properties:
+        id:
+          type: string
+          description: Invoice identifier.
+        subscription_id:
+          type: string
+          description: Subscription identifier.
+        status:
+          $ref: '#/components/schemas/InvoiceStatus'
+        period_start:
+          type: string
+          format: date-time
+          description: Billing period start.
+        period_end:
+          type: string
+          format: date-time
+          description: Billing period end.
+        currency:
+          type: string
+          description: ISO 4217 currency code.
+        total_amount:
+          type: integer
+          minimum: 0
+          description: Total amount in minor units of the currency.
+        issued_at:
+          type: string
+          format: date-time
+          description: Timestamp when the invoice was issued.
+        finalized_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Timestamp when the invoice was finalized, if applicable.
+        voided_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Timestamp when the invoice was voided, if applicable.
+    InvoiceStatus:
+      type: string
+      enum:
+        - DRAFT
+        - FINALIZED
+        - VOID
+    InvoiceListResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - items
+        - page
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Invoice'
+        page:
+          $ref: '#/components/schemas/Pagination'
